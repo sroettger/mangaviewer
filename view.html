@@ -1,0 +1,177 @@
+<body>
+
+<style>
+
+.flexContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.imgContainer {
+  position: relative;
+  width: fit-content;
+  margin: auto;
+}
+
+#overlay {
+ position: absolute;
+ top: 0;
+ left: 0;
+}
+
+.rightDiv {
+  display: flex;
+  flex-direction: column;
+  width: 50%;
+}
+
+.buttonDiv {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#jisho {
+  height: 100%;
+}
+
+button {
+  height: 60px;
+  width: 100%;
+}
+
+</style>
+
+<div class="flexContainer">
+  <div class="imgContainer">
+    <img id="image" height=100% ></img>
+    <canvas id="overlay" ></canvas>
+  </div>
+  <div class=rightDiv>
+    <iframe id="jisho" src="about:blank"></iframe>
+    <div class=buttonDiv>
+      <button onclick="prev();">prev</button>
+      <button onclick="next();">next</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const MAX_TEXT_LEN = 20;
+
+  class Polygon {
+    constructor(points) {
+      this.points = points;
+    }
+
+    drawTo(ctx) {
+      let scaleX = img.width / img.naturalWidth;
+      let scaleY = img.height / img.naturalHeight;
+      ctx.beginPath();
+      let start = this.points[0];
+      ctx.moveTo(start.x*scaleX, start.y*scaleY)
+      for (let point of this.points.slice(1)) {
+        ctx.lineTo(point.x*scaleX, point.y*scaleY);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // based on https://github.com/substack/point-in-polygon
+    pointIsInside(point) {
+      // ray-casting algorithm based on
+      // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
+
+      let inside = false;
+      for (let i = 0, j = this.points.length - 1; i < this.points.length; j = i++) {
+          let xi = this.points[i].x, yi = this.points[i].y;
+          let xj = this.points[j].x, yj = this.points[j].y;
+
+          let intersect = ((yi > point.y) != (yj > point.y))
+              && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+      }
+
+      return inside;
+    }
+  }
+
+  let annotations = [];
+
+  async function annotate() {
+    annotations = (await (await fetch(`/annotation?path=${path}`)).json())
+      .map(o => ({
+        text: o.text,
+        boundingBox: new Polygon(o.boundingBox)
+      }))
+      .filter(annotation => annotation.text.length <= MAX_TEXT_LEN);
+  }
+
+  function drawBoundingBoxes() {
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    for (let annotation of annotations) {
+      annotation.boundingBox.drawTo(ctx);
+    }
+  }
+
+  function clearBoundingBoxes() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  let down_pos = {x: 0, y: 0};
+
+  function findBoundingBoxes(point) {
+    let res = [];
+    for (let annotation of annotations) {
+      if (annotation.boundingBox.pointIsInside(point)) {
+        res.push(annotation)
+      }
+    }
+    return res;
+  }
+
+  function annotationClick(ev) {
+    let scaleX = img.naturalWidth / img.width;
+    let scaleY = img.naturalHeight / img.height;
+    let annotations = findBoundingBoxes({x: ev.offsetX*scaleX, y: ev.offsetY*scaleY});
+    if (annotations.length != 1) throw new Error(`Got ${annotations.length} annotations.`);
+    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(annotations[0].text)}`;
+  }
+
+  let canvas = document.getElementById('overlay');
+  let ctx = canvas.getContext('2d');
+  let img = document.getElementById('image');
+  let jishoFrame = document.getElementById('jisho');
+
+  let params = new URLSearchParams(location.search);
+
+  let path = params.get('path');
+  canvas.onclick = annotationClick;
+  img.onload = annotate();
+  img.src = `/img?path=${path}`;
+
+  window.onkeydown = ev => {
+    if (ev.code != "AltLeft") return;
+    drawBoundingBoxes();
+  }
+
+  window.onkeyup = ev => {
+    if (ev.code != "AltLeft") return;
+    clearBoundingBoxes();
+  }
+
+  async function next() {
+    const nextFile = await (await fetch(`/nextfile?path=${path}`)).text();
+    location.href = `/view?path=${nextFile}`;
+  }
+
+  async function prev() {
+    const prevFile = await (await fetch(`/prevfile?path=${path}`)).text();
+    location.href = `/view?path=${prevFile}`;
+  }
+
+</script>
