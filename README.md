@@ -1,7 +1,6 @@
 # mangaviewer
 A web app that displays images together with a Japanese dictionary.
 
-It looks roughly like this:
 ![](mangaviewer.gif)
 
 # setup
