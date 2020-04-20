@@ -99,6 +99,9 @@ button {
   let annotations = [];
 
   async function annotate() {
+    canvas.width = img.width;
+    canvas.height = img.height;
+
     annotations = (await (await fetch(`/annotation?path=${path}`)).json())
       .map(o => ({
         text: o.text,
@@ -148,7 +151,7 @@ button {
 
   let path = params.get('path');
   canvas.onclick = annotationClick;
-  img.onload = annotate();
+  img.onload = setTimeout(annotate, 50);
   img.src = `/img?path=${path}`;
 
   window.onkeydown = ev => {
