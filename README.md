@@ -1,6 +1,8 @@
 # mangaviewer
 A web app that displays images together with a Japanese dictionary.
-Check out this [tweet](https://twitter.com/_tsuro/status/1249773675299119105) for an example video.
+
+It looks roughly like this:
+![](mangaviewer.gif)
 
 # setup
 This is just a proof-of-concept so far and still work in progress.
