@@ -59,8 +59,6 @@ button {
 </div>
 
 <script>
-  const MAX_TEXT_LEN = 20;
-
   class Polygon {
     constructor(points) {
       this.points = points;
@@ -105,8 +103,7 @@ button {
       .map(o => ({
         text: o.text,
         boundingBox: new Polygon(o.boundingBox)
-      }))
-      .filter(annotation => annotation.text.length <= MAX_TEXT_LEN);
+      }));
   }
 
   function drawBoundingBoxes() {
@@ -138,8 +135,8 @@ button {
     let scaleX = img.naturalWidth / img.width;
     let scaleY = img.naturalHeight / img.height;
     let annotations = findBoundingBoxes({x: ev.offsetX*scaleX, y: ev.offsetY*scaleY});
-    if (annotations.length != 1) throw new Error(`Got ${annotations.length} annotations.`);
-    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(annotations[0].text)}`;
+    if (annotations.length == 0) throw new Error(`no bounding box found`);
+    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(annotations[annotations.length-1].text)}`;
   }
 
   let canvas = document.getElementById('overlay');
