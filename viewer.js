@@ -72,10 +72,35 @@ async function handleImg(req, res, url) {
   res.end(data);
 }
 
+function getAnnotationPath(file) {
+  if (!file.startsWith('manga/')) throw `path is not under manga: ${file}`;
+  return 'annotations' + file.slice('manga'.length);
+}
+
+async function getLocalAnnotations(file) {
+  let annotationPath = getAnnotationPath(file);
+  try {
+    return JSON.parse(await fs.readFile(annotationPath, 'utf-8'));
+  } catch (e) {
+    return undefined;
+  }
+}
+
+async function getRemoteAnnotations(file) {
+  const [result] = await client.documentTextDetection(file);
+  let annotationPath = getAnnotationPath(file);
+  await fs.mkdir(path.dirname(annotationPath), {recursive: true});
+  await fs.writeFile(annotationPath, JSON.stringify(result))
+  return result;
+}
+
 async function handleAnnotation(req, res, url) {
   const params = new URLSearchParams(url.search);
   let file = getMangaPath(params.get('path'));
-  const [result] = await client.documentTextDetection(file);
+  let result = await getLocalAnnotations(file);
+  if (!result) {
+    result = await getRemoteAnnotations(file);
+  }
 
   let annotations = [];
   for (let annotation of result.textAnnotations) {
