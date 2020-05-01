@@ -94,6 +94,16 @@ button {
 
       return inside;
     }
+
+    perimeter() {
+      let res = 0;
+      for (let i = 1; i < this.points.length; i++) {
+        let point = this.points[i];
+        let prev = this.points[i-1];
+        res += Math.sqrt((point.x-prev.x)**2 + (point.y-prev.y)**2);
+      }
+      return res;
+    }
   }
 
   let annotations = [];
@@ -134,12 +144,26 @@ button {
     return res;
   }
 
+  function smallestBoundingBox(annotations) {
+    let min_index = 0;
+    let min_value = annotations[0].boundingBox.perimeter();
+    for (let i = 1; i < annotations.length; i++) {
+      let annotation = annotations[i];
+      let value = annotation.boundingBox.perimeter();
+      if (value < min_value) {
+        min_index = i;
+        min_value = value;
+      }
+    }
+    return annotations[min_index];
+  }
+
   function annotationClick(ev) {
     let scaleX = img.naturalWidth / img.width;
     let scaleY = img.naturalHeight / img.height;
     let annotations = findBoundingBoxes({x: ev.offsetX*scaleX, y: ev.offsetY*scaleY});
     if (annotations.length == 0) throw new Error(`no bounding box found`);
-    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(annotations[annotations.length-1].text)}`;
+    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(smallestBoundingBox(annotations).text)}`;
   }
 
   let canvas = document.getElementById('overlay');
