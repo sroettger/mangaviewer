@@ -2,6 +2,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs').promises;
 const vision = require('@google-cloud/vision');
+const sharp = require('sharp');
 
 const hostname = '127.0.0.1';
 const port = 8000;
@@ -94,12 +95,54 @@ async function getRemoteAnnotations(file) {
   return result;
 }
 
+async function getAnnotationsInBox(file, boundingBox) {
+  let [x1, y1, x2, y2] = boundingBox;
+  let crop = {
+    width: Math.abs(x1-x2),
+    height: Math.abs(y1-y2),
+    left: Math.min(x1, x2),
+    top: Math.min(y1, y2)
+  };
+  let data = await sharp(file).extract(crop).png().toBuffer();
+  //const [result] = await client.documentTextDetection(data);
+  const request = {
+    "requests": [
+      {
+        "image": {
+          "content": data
+        },
+        "features": [
+          {
+            "type": "DOCUMENT_TEXT_DETECTION"
+          }
+        ],
+        "imageContext": {
+          "languageHints": ["ja"]
+        }
+      }
+    ]
+  };
+  //const [result] = await client.documentTextDetection({image: {content: data}, imageContext: {languageHints: ['jp']}});
+  //const [result] = await client.documentTextDetection({image: {content: data}, imageContext: {languageHints: ['ja']}});
+  const [result] = await client.batchAnnotateImages(request);
+  return result.responses[0];
+  //await sharp(file).extract(crop).toFile('tmp.png');
+  //const [result] = await client.documentTextDetection('tmp.png');
+  //return result
+}
+
 async function handleAnnotation(req, res, url) {
   const params = new URLSearchParams(url.search);
   let file = getMangaPath(params.get('path'));
-  let result = await getLocalAnnotations(file);
-  if (!result) {
-    result = await getRemoteAnnotations(file);
+  let result = undefined;
+  if (params.has('box')) {
+    let boundingBox = params.get('box').split(',').map(Number);
+    result = await getAnnotationsInBox(file, boundingBox);
+  } else {
+    result = await getLocalAnnotations(file);
+    if (!result) {
+      result = await getRemoteAnnotations(file);
+    }
   }
 
   let annotations = [];

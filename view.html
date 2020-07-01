@@ -158,12 +158,50 @@ button {
     return annotations[min_index];
   }
 
-  function annotationClick(ev) {
+  let clickStartX = -1;
+  let clickStartY = -1;
+
+  const MIN_MOVE_DISTANCE = 3;
+
+  function canvasMousedown(ev) {
+    clickStartX = ev.offsetX;
+    clickStartY = ev.offsetY;
+  }
+
+  function canvasMouseup(ev) {
+    if (clickStartX == -1 || clickStartY == -1) {
+      console.warn('mouseup before mousedown');
+      return;
+    }
+    clickEndX = ev.offsetX;
+    clickEndY = ev.offsetY;
+
     let scaleX = img.naturalWidth / img.width;
     let scaleY = img.naturalHeight / img.height;
-    let annotations = findBoundingBoxes({x: ev.offsetX*scaleX, y: ev.offsetY*scaleY});
+    let scaled = [clickStartX*scaleX, clickStartY*scaleY, clickEndX*scaleX, clickEndY*scaleY].map(Math.round);
+
+    if ((Math.abs(clickEndX - clickStartX) < MIN_MOVE_DISTANCE)
+      && (Math.abs(clickEndY - clickStartY) < MIN_MOVE_DISTANCE)) {
+      annotationClick(scaled[0], scaled[1]);
+    } else {
+      annotationDrag(...scaled);
+    }
+  }
+
+  function annotationClick(x, y) {
+    let annotations = findBoundingBoxes({x: x, y: y});
     if (annotations.length == 0) throw new Error(`no bounding box found`);
     jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(smallestBoundingBox(annotations).text)}`;
+  }
+
+  async function annotationDrag(x1, y1, x2, y2) {
+    let annotations = (await (await fetch(`/annotation?path=${path}&box=${x1},${y1},${x2},${y2}`)).json())
+      .map(o => ({
+        text: o.text,
+        boundingBox: new Polygon(o.boundingBox)
+      }));
+    if (annotations.length == 0) throw new Error(`no bounding box found`);
+    jishoFrame.src = `https://jisho.org/search/${encodeURIComponent(annotations[0].text)}`;
   }
 
   let canvas = document.getElementById('overlay');
@@ -174,7 +212,8 @@ button {
   let params = new URLSearchParams(location.search);
 
   let path = params.get('path');
-  canvas.onclick = annotationClick;
+  canvas.onmousedown = canvasMousedown;
+  canvas.onmouseup = canvasMouseup;
   img.onload = setTimeout(annotate, 50);
   img.src = `/img?path=${path}`;
 
